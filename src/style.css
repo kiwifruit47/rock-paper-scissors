@@ -1,0 +1,9 @@
+#player {
+  position: relative;
+}
+
+#video-element, #canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
