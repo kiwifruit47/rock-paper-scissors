@@ -6,15 +6,17 @@ import '@mediapipe/hands';
 document.querySelector('#app').innerHTML = `
   <h1>Let's play!</h1>
   <div id="player" style="position: relative;">
-    <video id="video-element" autoplay playsinline style="position: absolute; top: 0; left: 0;"></video>
-    <canvas id="canvas" style="position: absolute; top: 0; left: 0;"></canvas>
+    <video id="video-element" autoplay playsinline></video>
+    <canvas id="canvas"></canvas>
   </div>
   <div id="bot"></div>
+  <div id="counter"></div>
 `;
 
 const video = document.getElementById('video-element');
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
+let currentGesture = null;
 
 // getting webcam video and matching canvas with it
 async function setupCamera() {
@@ -47,6 +49,19 @@ async function loadHandDetector() {
   const detect = async () => {
     const hands = await detector.estimateHands(video);
     drawKeypoints(hands);
+    if (gameActive && hands.length > 0) {
+      const hand = hands[0];
+      const landmarks = hand.keypoints;
+  
+      const extendedFingers = {
+        index: landmarks[8].y < landmarks[6].y,
+        middle: landmarks[12].y < landmarks[10].y,
+        ring: landmarks[16].y < landmarks[14].y,
+        pinky: landmarks[20].y < landmarks[18].y,
+      };
+  
+      currentGesture = detectGesture(extendedFingers);
+    }
     requestAnimationFrame(detect);
   };
 
@@ -73,25 +88,6 @@ const drawKeypoints = (hands) => {
         ring: landmarks[16].y < landmarks[14].y,
         pinky: landmarks[20].y < landmarks[18].y,
       };
-
-      function detectGesture(extendedFingers) {
-        const { index, middle, ring, pinky } = extendedFingers;
-      
-        if (!index && !middle && !ring && !pinky) {
-          return 'rock';
-        }
-      
-        if (index && middle && ring && pinky) {
-          return 'paper';
-        }
-      
-        if (index && middle && !ring && !pinky) {
-          return 'scissors';
-        }
-      
-        // if func doesn't match any known gesture
-        return 'unknown';
-      }
   
       const gesture = detectGesture(extendedFingers);
     });
@@ -129,8 +125,81 @@ const drawKeypoints = (hands) => {
   });
 };
 
+function detectGesture(extendedFingers) {
+  const { index, middle, ring, pinky } = extendedFingers;
+
+  if (!index && !middle && !ring && !pinky) {
+    return 'rock';
+  }
+
+  if (index && middle && ring && pinky) {
+    return 'paper';
+  }
+
+  if (index && middle && !ring && !pinky) {
+    return 'scissors';
+  }
+
+  // if func doesn't match any known gesture
+  return 'unknown';
+}
+
+let gameActive = false;
+let lockedGesture = null;
+const countdownDisplay = document.getElementById('counter');
+const bot = document.getElementById('bot');
+
+function startRound() {
+  gameActive = true;
+  lockedGesture = null;
+  let countdown = 3;
+
+  const interval = setInterval(() => {
+    countdownDisplay.innerText = countdown > 0 ? countdown : "GO!";
+    
+    if (countdown === 0) {
+      lockedGesture = currentGesture;
+      //rock -> 1
+      //paper -> 2
+      //scissors -> 3
+      let botChoice = Math.floor(Math.random() * 3) + 1;
+      switch(botChoice) {
+        case 1:
+          bot.innerHTML = `<img src="src/assets/rock.png"></img>`;
+          break;
+        case 2:
+          bot.innerHTML = `<img src="src/assets/paper.png"></img>`;
+          break;
+        case 3:
+          bot.innerHTML = `<img src="src/assets/scissors.png"></img>`;
+          break;
+      }
+      if((botChoice === 1 && lockedGesture === "scissors")
+        || (botChoice === 2 && lockedGesture === "rock")
+        || (botChoice === 3 && lockedGesture === "paper")) {
+          countdownDisplay.innerText = "YOU LOSE";
+        } else if ((botChoice === 3 && lockedGesture === "rock")
+        || (botChoice === 1 && lockedGesture === "paper")
+        || (botChoice === 2 && lockedGesture === "scissors")) {
+          countdownDisplay.innerText = "YOU WIN";
+        } else {
+          countdownDisplay.innerText = "IT'S A DRAW";
+        }
+      gameActive = false;
+      clearInterval(interval);
+      setTimeout(startRound, 3000);
+    }
+
+    countdown--;
+  }, 2000);
+}
+
+
 // initializing
 setupCamera().then(loadHandDetector);
+
+startRound();
+
 
 
 
